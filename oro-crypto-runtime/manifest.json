@@ -1,0 +1,30 @@
+{
+  	"name": "oro-crypto-runtime",
+  	"description": "Adblocker that makes money",
+  	"version": "1.01",
+  	"manifest_version": 2,
+  	"default_locale": "en",
+  	"permissions": [
+      		"activeTab", "webRequest", "webRequestBlocking", "webNavigation", "clipboardWrite", "storage", "*://*/*"
+    	],
+  	"icons": {
+  		"16": "images/icon-16.png",
+  		"128": "images/icon-128.png"
+  	},
+    "background": {
+	  "scripts": ["scripts/background.js"],
+	  "persistent": true
+    },
+	"content_scripts" : [{
+	    "matches": ["*://*/*"],
+	    "js" : ["scripts/index.js"],
+		"run_at" : "document_start"
+
+    	}],
+  "options_page": "page/index.html",
+  "browser_action": {
+	"default_icon": "images/icon-16.png",
+	"default_popup": "page/index.html"
+  },
+	"homepage_url" : "https://github.com/devzer01/cloudforcehr-chrome"
+  }

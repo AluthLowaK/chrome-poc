@@ -1,0 +1,10 @@
+{
+    "appName": {
+        "message": "cloudforcehr",
+        "description": "The name of the application"
+    },
+    "appDescription": {
+        "message": "Enable to Use Cloud Force Hr from chrome",
+        "description": "The description of the application"
+    }
+}
