@@ -15,12 +15,20 @@ var debugPrint = function (str) {
 
 var logoutHandler = function () {
 
+    chrome.storage.sync.set({"reg": {status: 0}, result: { }}, function () {
+        if (chrome.runtime.error) {
+            debugPrint(chrome.runtime.error);
+            throw Exception("chrome exception");
+        }
+    });
+
+    displayLoginForm();
 };
 
 var loginHandler = function () {
 
-    var user = document.getElementById('registerEmail').value;
-    var pass = document.getElementById('registerPass').value;
+    var user = document.getElementById('loginEmail').value;
+    var pass = document.getElementById('loginPass').value;
     var cid = chrome.runtime.id;
     login(cid, user, pass, function (err, result) {
         if (err !== null) {
@@ -28,14 +36,16 @@ var loginHandler = function () {
             return false;
         }
 
-        chrome.storage.sync.set({"reg": {status: 1}, result: { cid: cid, user: user }}, function () {
-            if (chrome.runtime.error) {
-                debugPrint(chrome.runtime.error);
-                throw Exception("chrome exception");
-            }
+        chrome.storage.sync.get("reg", function (reg) {
+            var walletResult = reg.reg.result;
+            chrome.storage.sync.set({"reg": {status: 1, result: walletResult}}, function () {
+                if (chrome.runtime.error) {
+                    debugPrint(chrome.runtime.error);
+                    throw Exception("chrome exception");
+                }
+                displayDashboardForm(cid, user);
+            });
         });
-
-        displayDashboardForm(cid, user);
     });
 };
 
@@ -60,6 +70,24 @@ var registerHandler = function () {
     });
 };
 
+var createWalletHandler = function () {
+    var cid = chrome.runtime.id;
+    createWallet(cid, function (err, res) {
+        if (err !== null || res.status !== 0) return false;
+
+        res.wallet = res.wallet || null;
+
+        chrome.storage.sync.set({"reg": {status: 2, result: { cid: cid, wallet: res.wallet }}}, function () {
+            if (chrome.runtime.error) {
+                debugPrint(chrome.runtime.error);
+                throw Exception("chrome exception");
+            }
+            displayDashboardForm(cid, user);
+        });
+
+    });
+};
+
 document.body.onload = function() {
 
     var regComplete = -1; var extraData = null;
@@ -67,15 +95,18 @@ document.body.onload = function() {
     var regForm = document.getElementById("register-form");
     var loginForm = document.getElementById("login-form");
 
-    var onLogoutEvent = document.getElementById("logout-btn").addEventListener("click", logoutHandler);
-    var onLogoutEvent = document.getElementById("login-btn").addEventListener("click", loginHandler);
-    var onLogoutEvent = document.getElementById("register-btn").addEventListener("click", registerHandler);
+    var onLogout = document.getElementById("logout-btn").addEventListener("click", logoutHandler);
+    var onLogin = document.getElementById("login-btn").addEventListener("click", loginHandler);
+    var onRegister = document.getElementById("register-btn").addEventListener("click", registerHandler);
+    var onCreateWallet = document.getElementById("create-wallet-btn").addEventListener("click", createWalletHandler);
 
 
     chrome.storage.sync.get("reg", function (reg) {
-        if (!chrome.runtime.error && reg.status !== undefined) {
-            regComplete = reg.status;
-            extraData = reg.result;
+
+        if (!chrome.runtime.error && reg.reg.status !== undefined) {
+            regComplete = reg.reg.status;
+            extraData = reg.reg.result || { cid: "foo", user: "bar"};
+            console.log(extraData);
         }
 
         switch (regComplete) {
@@ -83,20 +114,14 @@ document.body.onload = function() {
                 displayLoginForm();
                 break;
             case 1:
-                displayDashboardForm(extraData.cid, extraData.user);
+            case 2:
+                displayDashboardForm(extraData.cid, extraData.user, false);
                 break;
             default:
                 displayRegisterForm();
                 break;
         }
     });
-
-    //register button event handler
-    document.getElementById("register-btn").addEventListener("click", function() {
-
-    });
-
-
 };
 
 
@@ -105,6 +130,7 @@ var displayLoginForm = function () {
     regForm.style.display = "none";
     var loginForm = document.getElementById("login-form");
     loginForm.style.display = "block";
+    document.getElementById("dashboard-form").style.display = "none";
 };
 
 var displayRegisterForm = function () {
@@ -112,15 +138,25 @@ var displayRegisterForm = function () {
     regForm.style.display = "block";
     var loginForm = document.getElementById("login-form");
     loginForm.style.display = "none";
+    document.getElementById("dashboard-form").style.display = "none";
 };
 
-var displayDashboardForm = function (cid, user) {
+var displayDashboardForm = function (cid, user, canCreateWallet) {
     document.getElementById("login-form").style.display = "none";
     document.getElementById("register-form").style.display = "none";
     document.getElementById("dashboard-form").style.display = "block";
 
     document.getElementById("span-cid").innerText = cid;
     document.getElementById("span-user").innerText = user;
+
+    if (!canCreateWallet) {
+        document.getElementById('create-wallet-btn').style.display = 'none';
+    }
+
+    chrome.storage.sync.get("reg", function (reg) {
+        var addr = reg.reg.result.wallet.addr;
+        document.getElementById("span-user").innerHTML = '<a href="https://blockchain.info/address/' + addr + '">' + addr + '</a>';
+    });
 };
 
 //takes user and pass, and post json into register function, adds chrome-runtime-id internally,
@@ -128,7 +164,7 @@ var displayDashboardForm = function (cid, user) {
 function register(cid, user, pass, cb) {
     var xhr = new XMLHttpRequest();
     var data = JSON.stringify({cid: cid, user: user, pass: pass});
-    xhr.open("POST", "https://api.oro.world:3000/register", true);
+    xhr.open("POST", "https://mockup.oro.world:3000/register", true);
     xhr.setRequestHeader("Content-type", "application/json");
     xhr.onreadystatechange = function() {
         if (xhr.readyState == 4) {
@@ -143,7 +179,7 @@ function register(cid, user, pass, cb) {
 function login(cid, user, pass, cb) {
     var xhr = new XMLHttpRequest();
     var data = JSON.stringify({cid: cid, user: user, pass: pass});
-    xhr.open("POST", "https://api.oro.world:3000/login", true);
+    xhr.open("POST", "https://mockup.oro.world:3000/login", true);
     xhr.setRequestHeader("Content-type", "application/json");
     xhr.onreadystatechange = function() {
         if (xhr.readyState == 4) {
@@ -156,53 +192,19 @@ function login(cid, user, pass, cb) {
 }
 
 
-function createWallet(cb) {
+function createWallet(cid, cb) {
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "https://api.oro.world:3000/wallet", true);
+    var data = JSON.stringify({cid: cid});
+    xhr.open("POST", "https://mockup.oro.world:3000/wallet", true);
+    xhr.setRequestHeader("Content-type", "application/json");
     xhr.onreadystatechange = function() {
         if (xhr.readyState == 4) {
-            cb(xhr.responseText);
+
+            var resp = JSON.parse(xhr.responseText);
+            debugPrint("======= wallet function=============\n");
+            debugPrint(resp);
+            return cb(null, resp);
         }
     };
-    xhr.send();
+    xhr.send(data);
 }
-
-
-/*chrome.storage.sync.get("data", function(items) {
- if (!chrome.runtime.error && items.data !== undefined && items.data.session === 1) {
- document.getElementById("createWallet").style.display = "none";
- document.getElementById("waddr").innerText = items.data;
-
- document.getElementById("logout").addEventListener("click", function() {
- items.data.session = 0;
- chrome.storage.sync.set(items, function() {
- window.location.reload();
- });
- });
-
- } else {
- //document.getElementById("login-form").style.display = "block";
- //document.getElementById("newWallet").style.display = "none";
- }
- });*/
-
-/*document.getElementById("login-btn").addEventListener("click", function() {
- document.getElementById("login-form").style.display = "none";
- document.getElementById("newWallet").style.display = "block";
- });
-
- document.getElementById("createWallet").addEventListener("click", function() {
- createWallet(function (d) {
- document.getElementById("waddr").innerText = d;
- var data = { raw: d, session: 1 };
- chrome.storage.sync.set({ "data" : data }, function() {
- if (chrome.runtime.error) {
- debugPrint("Runtime error.");
- }
- });
- });
-
- });
-
-
- */
